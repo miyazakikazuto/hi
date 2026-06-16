@@ -1,0 +1,6 @@
+{
+  "name": "Pelacak Keuangan",
+  "description": "Aplikasi pelacak pemasukan dan pengeluaran keuangan pribadi dengan analisis grafik, ekspor PDF, dan sinkronisasi akun.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
