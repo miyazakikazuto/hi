@@ -11,5 +11,5 @@ data class Transaction(
     val category: String,
     val notes: String = "",
     val dateMillis: Long = System.currentTimeMillis(),
-    val accountEmail: String = "" // Under which google account this is stored (supports multi-device sync simulation)
+    val accountEmail: String = "", // Under which google account this is stored (supports multi-device sync simulation)
 )

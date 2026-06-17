@@ -4,8 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +24,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
                 val db = AppDatabase.getDatabase(applicationContext)
                 val repository = TransactionRepository(db.transactionDao())
                 val vm: MainViewModel = viewModel(
-                    factory = ViewModelFactory(application, repository)
+                    factory = ViewModelFactory(application, repository),
                 )
                 MainScreen(viewModel = vm)
             }
@@ -64,11 +64,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+fun Greeting(name: String, modifier: Modifier = Modifier) {
+    Text(
+        text = "Hello $name!",
+        modifier = modifier
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
-    var activeTab by remember { mutableStateOf(0) } // 0: Transaksi, 1: Analisis, 2: Sinkronisasi & Akun
-    var showAddDialog by remember { mutableStateOf(false) }
+    var activeTab by remember { mutableIntStateOf(0) } // 0: Transaksi, 1: Analisis, 2: Sinkronisasi & Akun
+    var showAddDialog by remember { mutableStateOf(value = false) }
 
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
     val userName by viewModel.userName.collectAsStateWithLifecycle()
@@ -199,7 +207,7 @@ fun TransaksiTab(viewModel: MainViewModel) {
     }
     val totalSaldo = totalMundurMasukan - totalMundurKeluaran
 
-    val idLocale = Locale("id", "ID")
+    val idLocale = Locale.forLanguageTag("id-ID")
     val rupiahFormatter = NumberFormat.getCurrencyInstance(idLocale).apply {
         maximumFractionDigits = 0
     }
@@ -443,7 +451,7 @@ fun TransactionItem(
     rupiahFormatter: NumberFormat
 ) {
     val isPemasukan = transaction.type == "PEMASUKAN"
-    val sdf = SimpleDateFormat("dd MMM yyyy", Locale("id", "ID"))
+    val sdf = SimpleDateFormat("dd MMM yyyy", Locale.forLanguageTag("id-ID"))
 
     Card(
         modifier = Modifier
@@ -747,8 +755,9 @@ fun AnalisisTab(viewModel: MainViewModel) {
                                             .background(colors[colorIndex])
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
+                                    val locale = LocalConfiguration.current.locales[0]
                                     Text(
-                                        text = "$category (${String.format(Locale.getDefault(), "%.1f", percent)}%)",
+                                        text = "$category (${String.format(locale, "%.1f", percent)}%)",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -800,8 +809,6 @@ fun AkunTab(viewModel: MainViewModel) {
     val isCloudSyncEnabled by viewModel.isCloudSyncEnabled.collectAsStateWithLifecycle()
 
     var showLoginSheet by remember { mutableStateOf(false) }
-
-    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -1139,7 +1146,7 @@ fun AddTransactionDialog(
     onConfirm: (Double, String, String, String, Long) -> Unit
 ) {
     var amountStr by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("PENGELUARAN") } // "PEMASUKAN" or "PENGELUARAN"
+    var type by remember { mutableStateOf("PEMASUKAN") } // Default to "PEMASUKAN"
     
     val currentIncomes = listOf("Gaji", "Sampingan", "Investasi", "Hadiah", "Lain-lain")
     val currentExpenses = listOf("Makanan", "Transportasi", "Belanja", "Tagihan", "Kesehatan", "Lain-lain")
@@ -1182,19 +1189,6 @@ fun AddTransactionDialog(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
-                        onClick = { type = "PENGELUARAN" },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (type == "PENGELUARAN") MaterialTheme.colorScheme.error else Color.Transparent,
-                            contentColor = if (type == "PENGELUARAN") Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("type_pengeluaran_btn"),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Pengeluaran")
-                    }
-                    Button(
                         onClick = { type = "PEMASUKAN" },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (type == "PEMASUKAN") Color(0xFF2E7D32) else Color.Transparent,
@@ -1206,6 +1200,19 @@ fun AddTransactionDialog(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("Pemasukan")
+                    }
+                    Button(
+                        onClick = { type = "PENGELUARAN" },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (type == "PENGELUARAN") MaterialTheme.colorScheme.error else Color.Transparent,
+                            contentColor = if (type == "PENGELUARAN") Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("type_pengeluaran_btn"),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Pengeluaran")
                     }
                 }
 
@@ -1280,7 +1287,7 @@ fun AddTransactionDialog(
                     Button(
                         onClick = {
                             val amount = amountStr.toDoubleOrNull()
-                            if (amount != null && amount > 0) {
+                            if ((amount != null) && (amount > 0)) {
                                 onConfirm(amount, type, category, notes, System.currentTimeMillis())
                             }
                         },

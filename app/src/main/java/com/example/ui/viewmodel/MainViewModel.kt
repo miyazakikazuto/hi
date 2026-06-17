@@ -1,7 +1,6 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
-import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
@@ -14,7 +13,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.data.local.AppDatabase
 import com.example.data.model.Transaction
 import com.example.data.repository.TransactionRepository
 import kotlinx.coroutines.delay
@@ -25,40 +23,42 @@ import java.io.FileOutputStream
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class MainViewModel(
     private val application: Application,
-    private val repository: TransactionRepository
+    private val repository: TransactionRepository,
 ) : AndroidViewModel(application) {
 
     // Filter states
-    private val _selectedMonth = MutableStateFlow<Int>(Calendar.getInstance().get(Calendar.MONTH) + 1) // 1-indexed (1 = Jan)
+    private val _selectedMonth = MutableStateFlow(Calendar.getInstance()[Calendar.MONTH] + 1) // 1-indexed (1 = Jan)
     val selectedMonth: StateFlow<Int> = _selectedMonth.asStateFlow()
 
-    private val _selectedYear = MutableStateFlow<Int>(Calendar.getInstance().get(Calendar.YEAR))
+    private val _selectedYear = MutableStateFlow(Calendar.getInstance()[Calendar.YEAR])
     val selectedYear: StateFlow<Int> = _selectedYear.asStateFlow()
 
-    private val _selectedCategoryFilter = MutableStateFlow<String>("Semua")
+    private val _selectedCategoryFilter = MutableStateFlow("Semua")
     val selectedCategoryFilter: StateFlow<String> = _selectedCategoryFilter.asStateFlow()
 
     // Authentication States (Mock Google Sign-In with real-like properties)
-    private val _isLoggedIn = MutableStateFlow<Boolean>(false)
+    private val _isLoggedIn = MutableStateFlow(value = false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
-    private val _userEmail = MutableStateFlow<String>("")
+    private val _userEmail = MutableStateFlow("")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
 
-    private val _userName = MutableStateFlow<String>("")
+    private val _userName = MutableStateFlow("")
     val userName: StateFlow<String> = _userName.asStateFlow()
 
     // Sync States
-    private val _isSyncing = MutableStateFlow<Boolean>(false)
+    private val _isSyncing = MutableStateFlow(value = false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
-    private val _lastSyncTime = MutableStateFlow<String>("Belum pernah")
+    private val _lastSyncTime = MutableStateFlow("Belum pernah")
     val lastSyncTime: StateFlow<String> = _lastSyncTime.asStateFlow()
 
-    private val _isCloudSyncEnabled = MutableStateFlow<Boolean>(false)
+    private val _isCloudSyncEnabled = MutableStateFlow(value = false)
     val isCloudSyncEnabled: StateFlow<Boolean> = _isCloudSyncEnabled.asStateFlow()
 
     // Raw transactions list from Room
@@ -66,14 +66,14 @@ class MainViewModel(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+            initialValue = emptyList(),
         )
 
     // Filtered transaction lists
     val filteredTransactions: StateFlow<List<Transaction>> = combine(
         allTransactions,
         combine(_selectedMonth, _selectedYear, _selectedCategoryFilter) { m, y, c -> Triple(m, y, c) },
-        combine(_isLoggedIn, _userEmail) { logged, email -> Pair(logged, email) }
+        combine(_isLoggedIn, _userEmail) { logged, email -> Pair(logged, email) },
     ) { txList, dateAndCategory, authInfo ->
         val (month, year, cat) = dateAndCategory
         val (isLoggedIn, email) = authInfo
@@ -83,9 +83,9 @@ class MainViewModel(
             val txMonth = cal.get(Calendar.MONTH) + 1
             val txYear = cal.get(Calendar.YEAR)
             
-            val matchesMonth = month == 0 || txMonth == month
+            val matchesMonth = (month == 0) || (txMonth == month)
             val matchesYear = txYear == year
-            val matchesCat = cat == "Semua" || tx.category == cat
+            val matchesCat = (cat == "Semua") || (tx.category == cat)
             
             // If logged in, show transactions bound to this google email or general guest.
             // If offline, show all guest/general transactions.
@@ -98,72 +98,6 @@ class MainViewModel(
             matchesMonth && matchesYear && matchesCat && matchesEmail
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // Initial dummy data generator
-    init {
-        viewModelScope.launch {
-            // Check if db is empty, if so, insert mock records
-            allTransactions.first { true } // Wait for flow initialization
-            delay(300)
-            if (allTransactions.value.isEmpty()) {
-                insertMockData()
-            }
-        }
-    }
-
-    private suspend fun insertMockData() {
-        val now = Calendar.getInstance()
-        
-        val t1 = Transaction(
-            amount = 12000000.0,
-            type = "PEMASUKAN",
-            category = "Gaji",
-            notes = "Gaji Pokok Bulanan",
-            dateMillis = now.apply { set(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
-        )
-        val t2 = Transaction(
-            amount = 1500000.0,
-            type = "PENGELUARAN",
-            category = "Belanja",
-            notes = "Spurs & Kebutuhan Bulanan",
-            dateMillis = now.apply { set(Calendar.DAY_OF_MONTH, 2) }.timeInMillis
-        )
-        val t3 = Transaction(
-            amount = 180000.0,
-            type = "PENGELUARAN",
-            category = "Makanan",
-            notes = "Makan siang bersama tim",
-            dateMillis = now.apply { set(Calendar.DAY_OF_MONTH, 4) }.timeInMillis
-        )
-        val t4 = Transaction(
-            amount = 250000.0,
-            type = "PENGELUARAN",
-            category = "Transportasi",
-            notes = "Isi bensin Pertamax",
-            dateMillis = now.apply { set(Calendar.DAY_OF_MONTH, 5) }.timeInMillis
-        )
-        val t5 = Transaction(
-            amount = 3500000.0,
-            type = "PEMASUKAN",
-            category = "Sampingan",
-            notes = "Desain Freelance UI/UX",
-            dateMillis = now.apply { set(Calendar.DAY_OF_MONTH, 8) }.timeInMillis
-        )
-        val t6 = Transaction(
-            amount = 450000.0,
-            type = "PENGELUARAN",
-            category = "Tagihan",
-            notes = "Tagihan Listrik & WiFi",
-            dateMillis = now.apply { set(Calendar.DAY_OF_MONTH, 10) }.timeInMillis
-        )
-
-        repository.insert(t1)
-        repository.insert(t2)
-        repository.insert(t3)
-        repository.insert(t4)
-        repository.insert(t5)
-        repository.insert(t6)
-    }
 
     // Setters for filters
     fun setMonth(month: Int) {
@@ -234,9 +168,9 @@ class MainViewModel(
         viewModelScope.launch {
             if (!_isLoggedIn.value) return@launch
             _isSyncing.value = true
-            delay(1500) // Simulate cloud transit delay
+            delay(1.5.seconds) // Simulate cloud transit delay
             _isSyncing.value = false
-            val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm:ss", Locale("id", "ID"))
+            val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm:ss", Locale.forLanguageTag("id-ID"))
             _lastSyncTime.value = sdf.format(Date())
         }
     }
@@ -259,7 +193,7 @@ class MainViewModel(
 
             try {
                 _isSyncing.value = true
-                delay(800) // Visual progress simulation
+                delay(800.milliseconds) // Visual progress simulation
 
                 val pdfDocument = PdfDocument()
                 val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 Size (595x842 pt)
@@ -295,7 +229,7 @@ class MainViewModel(
                     textSize = 10f
                     isFakeBoldText = false
                 }
-                val sdfDate = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID"))
+                val sdfDate = SimpleDateFormat("dd MMMM yyyy", Locale.forLanguageTag("id-ID"))
                 canvas.drawText("Dicetak pada: ${sdfDate.format(Date())}", 420f, 35f, textPaint)
 
                 // User details
@@ -316,7 +250,7 @@ class MainViewModel(
                 }
                 val balance = totIncome - totExpense
 
-                val numFormat = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+                val numFormat = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).apply {
                     maximumFractionDigits = 0
                 }
 
@@ -373,7 +307,7 @@ class MainViewModel(
                 textPaint.isFakeBoldText = false
                 var yOffset = 265f
                 val rowHeight = 22f
-                val sdfRow = SimpleDateFormat("dd/MM/yyyy", Locale("id", "ID"))
+                val sdfRow = SimpleDateFormat("dd/MM/yyyy", Locale.forLanguageTag("id-ID"))
 
                 for (idx in transactions.indices) {
                     val tx = transactions[idx]
